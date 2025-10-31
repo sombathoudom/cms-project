@@ -1,0 +1,14 @@
+# Coverage Ledger
+
+| Feature | Models | Endpoints | Tests |
+| --- | --- | --- | --- |
+| Authentication & RBAC | User, Role, Permission, AuditLog | `/health` (auth bypass via Gate) | `RbacPolicyTest`, `AuthPermissionTest`, `HealthCheckTest` |
+| Content Lifecycle | Content, ContentRevision, ContentStatus, ContentSlugHistory, SeoMeta, SitemapEntry | Filament KB resource | `KnowledgeBaseCrudTest`, `TenancyScopeTest` |
+| Media Library | Media, MediaUsage | Filament media pickers (service layer) | `FactoryTest` |
+| Taxonomy & Metadata | Category, Tag | Used via content relations | `FactoryTest`, `TenancyScopeTest` |
+| Publishing Workflow | Workflow, WorkflowStep, WorkflowInstance, WorkflowAction, PublishQueue, Ticket | Filament Ticket resource | `TicketCrudTest`, `RbacPolicyTest` |
+| Site Settings | Setting, Menu, MenuItem, PageLayout, Announcement, Theme, Backup, CacheEntry | Admin configuration APIs (seeder) | `FactoryTest` |
+| API & Headless | ApiToken, Webhook, ApiLog | `/health` | `HealthCheckTest` |
+| Security & Compliance | AuditLog | `/health` validation | `HealthCheckTest`, `AuthPermissionTest` |
+| DevOps & QA | Dockerfile, docker-compose, Makefile, CI workflow | n/a | CI workflow |
+| System Architecture Foundations | Domain directory structure, policies | n/a | All tests exercising policies |
