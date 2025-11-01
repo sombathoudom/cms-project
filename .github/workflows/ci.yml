@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  composer-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+      - run: composer install --no-interaction --no-progress
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: npm-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+
+  lint:
+    needs: composer-cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+      - run: composer install --no-interaction --no-progress
+      - name: Run Pint
+        run: vendor/bin/pint --test
+
+  phpstan:
+    needs: composer-cache
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+      - run: composer install --no-interaction --no-progress
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --no-progress
+
+  tests:
+    needs: [composer-cache, lint, phpstan]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4']
+        database: [mysql, pgsql]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: cms
+          MYSQL_USER: cms
+          MYSQL_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: cms
+          POSTGRES_PASSWORD: secret
+          POSTGRES_USER: cms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U cms -d cms"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: xdebug
+      - uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+      - run: composer install --no-interaction --no-progress
+      - name: Run migrations
+        env:
+          DB_CONNECTION: ${{ matrix.database == 'pgsql' && 'pgsql' || 'mysql' }}
+          DB_HOST: ${{ matrix.database == 'pgsql' && '127.0.0.1' || '127.0.0.1' }}
+          DB_PORT: ${{ matrix.database == 'pgsql' && '5432' || '3306' }}
+          DB_DATABASE: cms
+          DB_USERNAME: cms
+          DB_PASSWORD: secret
+        run: php artisan migrate --force
+      - name: Run Pest tests
+        env:
+          DB_CONNECTION: ${{ matrix.database == 'pgsql' && 'pgsql' || 'mysql' }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ matrix.database == 'pgsql' && '5432' || '3306' }}
+          DB_DATABASE: cms
+          DB_USERNAME: cms
+          DB_PASSWORD: secret
+        run: |
+          vendor/bin/pest --ci --coverage --coverage-clover=coverage.xml
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.php }}-${{ matrix.database }}
+          path: coverage.xml
