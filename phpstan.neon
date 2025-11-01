@@ -1,0 +1,16 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/larastan/larastan/rules.neon
+
+parameters:
+    level: 8
+    paths:
+        - app
+        - config
+        - database
+    tmpDir: storage/framework/cache/phpstan
+    checkMissingIterableValueType: false
+    parallel:
+        maximumNumberOfProcesses: 4
+    ignoreErrors:
+        - '#Call to an undefined static method Filament\\#'

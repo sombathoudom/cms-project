@@ -1,0 +1,13 @@
+{
+    "preset": "strict",
+    "rules": {
+        "binary_operator_spaces": {
+            "operators": {
+                "=>": "align_single_space_minimal"
+            }
+        },
+        "ordered_imports": {
+            "sort_algorithm": "alpha"
+        }
+    }
+}

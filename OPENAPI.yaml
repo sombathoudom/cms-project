@@ -1,0 +1,490 @@
+openapi: 3.0.3
+info:
+  title: CMS Platform API
+  version: 0.1.0
+paths:
+  /api/v1/admin/audit-logs:
+    get:
+      summary: List audit logs
+      description: Returns paginated audit log entries scoped to the authenticated administrator's tenant.
+      tags:
+        - Audit Logs
+      parameters:
+        - in: query
+          name: action
+          schema:
+            type: string
+          description: Filter by action prefix (e.g., user.created).
+        - in: query
+          name: actor_id
+          schema:
+            type: string
+            format: uuid
+          description: Filter by the actor's UUID.
+        - in: query
+          name: target_type
+          schema:
+            type: string
+          description: Filter by the polymorphic target type.
+        - in: query
+          name: target_id
+          schema:
+            type: string
+            format: uuid
+          description: Filter by the polymorphic target identifier.
+        - in: query
+          name: date_from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: date_to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Results per page (default 25).
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/content/{content}/autosave:
+    post:
+      summary: Auto-save content draft
+      description: Persists an in-progress draft update and records a revision when changes are detected.
+      tags:
+        - Content
+      parameters:
+        - in: path
+          name: content
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                excerpt:
+                  type: string
+                body:
+                  type: string
+                settings_snapshot:
+                  type: object
+                  additionalProperties: true
+              required:
+                - body
+      responses:
+        '200':
+          description: Draft saved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Content'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/content/{content}/preview-link:
+    post:
+      summary: Generate signed preview link
+      description: Creates a time-bound preview URL for reviewing draft content without authentication.
+      tags:
+        - Content
+      parameters:
+        - in: path
+          name: content
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Preview link generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PreviewLink'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/content/{content}/media:
+    post:
+      summary: Embed media asset into content body
+      description: Associates a library asset with the content record and returns responsive markup for insertion into the editor.
+      tags:
+        - Content
+        - Media
+      parameters:
+        - in: path
+          name: content
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                media_id:
+                  type: string
+                  format: uuid
+                alt_text:
+                  type: string
+                  maxLength: 255
+                position:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000
+              required:
+                - media_id
+      responses:
+        '200':
+          description: Media embedded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/MediaEmbed'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Media not found within tenant scope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/media:
+    get:
+      summary: List media assets
+      description: Returns a paginated list of media assets scoped to the authenticated tenant with optional search filters.
+      tags:
+        - Media
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Filter assets by original file name or MIME type.
+        - in: query
+          name: type
+          schema:
+            type: string
+          description: Filter by MIME type prefix (e.g. `image/`).
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Number of results per page.
+      responses:
+        '200':
+          description: Media listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Media'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Upload media asset
+      description: Stores a new media asset on the configured filesystem and records metadata for future reuse.
+      tags:
+        - Media
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                alt_text:
+                  type: string
+                  maxLength: 255
+              required:
+                - file
+      responses:
+        '201':
+          description: Media uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Media'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          nullable: true
+        action:
+          type: string
+        target_type:
+          type: string
+          nullable: true
+        target_id:
+          type: string
+          format: uuid
+          nullable: true
+        actor:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            email:
+              type: string
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    Content:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: string
+          nullable: true
+        body:
+          type: string
+        status:
+          type: string
+        publish_at:
+          type: string
+          format: date-time
+          nullable: true
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+          nullable: true
+        author:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    Media:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        original_name:
+          type: string
+        mime_type:
+          type: string
+        size:
+          type: integer
+        width:
+          type: integer
+          nullable: true
+        height:
+          type: integer
+          nullable: true
+        url:
+          type: string
+          format: uri
+        uploaded_at:
+          type: string
+          format: date-time
+          nullable: true
+    MediaEmbed:
+      type: object
+      properties:
+        markup:
+          type: string
+        media:
+          $ref: '#/components/schemas/Media'
+    PreviewLink:
+      type: object
+      properties:
+        preview_url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        last_page:
+          type: integer
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+      required:
+        - error
